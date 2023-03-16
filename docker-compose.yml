@@ -1,0 +1,43 @@
+version: "3.9"
+services:
+    locust:
+        image: locustio/locust:latest
+        container_name: locust
+        ports:
+            - "8089:8089"
+        volumes:
+            - ./performance_tests/:/mnt/locust
+        command: --host https://lionfish-app-service-jg4shv4z-3jlq6.ondigitalocean.app/api --autostart -r 10 -u 4 -t 2m --locustfile /mnt/locust/hospital_tests.py --print-stats --exit-code-on-error 1
+
+    locust-metrics-exporter:
+        image: containersol/locust_exporter:latest
+        ports:
+            - "9646:9646"
+        environment:
+            - LOCUST_EXPORTER_URI=http://locust:8089
+        depends_on:
+            - locust
+
+    prometheus:
+        image: prom/prometheus:latest
+        container_name: prometheus
+        ports:
+            - "9090:9090"
+        command:
+            - --config.file=/etc/prometheus/prometheus.yml
+        volumes:
+            - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+    grafana:
+        image: grafana/grafana-oss:latest
+        environment:
+            - GF_AUTH_BASIC_ENABLED=false
+            - GF_AUTH_ANONYMOUS_ENABLED=true
+            - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+        container_name: grafana
+        ports:
+            - "3000:3000"
+        volumes:
+            - ./grafana/provisioning/:/etc/grafana/provisioning/
+        depends_on:
+            - prometheus
